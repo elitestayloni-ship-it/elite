@@ -46,6 +46,7 @@ export const Route = createFileRoute("/admin/")({
 });
 
 type Enquiry = Tables<"enquiries">;
+type RoomCategoryImageRow = Pick<Tables<"room_categories">, "slug" | "image_path" | "image_paths">;
 type Banner = {
   tone: "success" | "error";
   message: string;
@@ -64,6 +65,53 @@ function formatDashboardErrorMessage(message: string) {
   return message;
 }
 
+function isMissingImagePathsColumnError(message: string) {
+  const normalized = message.toLowerCase();
+
+  return normalized.includes("image_paths") && (normalized.includes("schema cache") || normalized.includes("column"));
+}
+
+async function loadRoomCategoryRows() {
+  const roomResponse = await supabase.from("room_categories").select("slug, image_path, image_paths");
+
+  if (!roomResponse.error) {
+    return {
+      rows: (roomResponse.data ?? []) as RoomCategoryImageRow[],
+      supportsImagePathsColumn: true,
+      errorMessage: null as string | null,
+    };
+  }
+
+  if (!isMissingImagePathsColumnError(roomResponse.error.message)) {
+    return {
+      rows: null,
+      supportsImagePathsColumn: true,
+      errorMessage: roomResponse.error.message,
+    };
+  }
+
+  const legacyRoomResponse = await supabase.from("room_categories").select("slug, image_path");
+
+  if (legacyRoomResponse.error) {
+    return {
+      rows: null,
+      supportsImagePathsColumn: false,
+      errorMessage: legacyRoomResponse.error.message,
+    };
+  }
+
+  const rows: RoomCategoryImageRow[] = (legacyRoomResponse.data ?? []).map((row) => ({
+    ...row,
+    image_paths: row.image_path ? [row.image_path] : [],
+  }));
+
+  return {
+    rows,
+    supportsImagePathsColumn: false,
+    errorMessage: null as string | null,
+  };
+}
+
 function getRoomSlotKey(slug: string, slotIndex: number) {
   return `${slug}:${slotIndex}`;
 }
@@ -77,6 +125,7 @@ function AdminDashboard() {
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [heroMedia, setHeroMedia] = useState<SiteMediaAsset>(() => getDefaultHeroMedia());
   const [roomCards, setRoomCards] = useState<RoomCard[]>(() => getDefaultRoomCards());
+  const [supportsImagePathsColumn, setSupportsImagePathsColumn] = useState(true);
   const [galleryItems, setGalleryItems] = useState<GalleryAsset[]>([]);
   const [screenError, setScreenError] = useState<string>("");
   const [heroBanner, setHeroBanner] = useState<Banner | null>(null);
@@ -139,9 +188,9 @@ function AdminDashboard() {
         return;
       }
 
-      const [enquiryResponse, roomResponse, galleryResponse] = await Promise.all([
+      const [enquiryResponse, roomLoadResult, galleryResponse] = await Promise.all([
         supabase.from("enquiries").select("*").order("created_at", { ascending: false }),
-        supabase.from("room_categories").select("slug, image_path, image_paths"),
+        loadRoomCategoryRows(),
         supabase
           .from("gallery_images")
           .select("id, image_path, alt_text, created_at")
@@ -158,15 +207,23 @@ function AdminDashboard() {
         setEnquiries(enquiryResponse.data ?? []);
       }
 
-      if (roomResponse.error) {
+      setSupportsImagePathsColumn(roomLoadResult.supportsImagePathsColumn);
+
+      if (roomLoadResult.errorMessage) {
         setRoomBanner({
           tone: "error",
           message: "Saved room images could not be loaded, so the default website images are being shown.",
         });
+      } else if (!roomLoadResult.supportsImagePathsColumn) {
+        setRoomBanner({
+          tone: "error",
+          message:
+            "This Supabase project is still using the legacy room image schema. Slot 1 works, but slots 2-4 need the latest migration that adds room_categories.image_paths.",
+        });
       }
 
       setRoomCards(
-        buildRoomCards(roomResponse.data, (imagePath) =>
+        buildRoomCards(roomLoadResult.rows, (imagePath) =>
           supabase.storage.from(ROOM_IMAGE_BUCKET).getPublicUrl(imagePath).data.publicUrl,
         ),
       );
@@ -391,6 +448,15 @@ function AdminDashboard() {
       return;
     }
 
+    if (!supportsImagePathsColumn && slotIndex > 0) {
+      setRoomBanner({
+        tone: "error",
+        message:
+          "Slots 2-4 need the latest Supabase migration. Right now this project can save only slot 1 (image_path).",
+      });
+      return;
+    }
+
     if (!file.type.startsWith("image/")) {
       setRoomBanner({ tone: "error", message: "Please choose a valid image file." });
       return;
@@ -419,15 +485,22 @@ function AdminDashboard() {
     nextImagePaths[slotIndex] = filePath;
     const imagePathsForSave = nextImagePaths.filter(Boolean).slice(0, MAX_ROOM_IMAGES);
 
-    const { error: saveError } = await supabase.from("room_categories").upsert(
-      {
-        slug: room.slug,
-        name: room.name,
-        image_path: imagePathsForSave[0] ?? null,
-        image_paths: imagePathsForSave,
-      },
-      { onConflict: "slug" },
-    );
+    const roomCategoryPayload = supportsImagePathsColumn
+      ? {
+          slug: room.slug,
+          name: room.name,
+          image_path: imagePathsForSave[0] ?? null,
+          image_paths: imagePathsForSave,
+        }
+      : {
+          slug: room.slug,
+          name: room.name,
+          image_path: imagePathsForSave[0] ?? null,
+        };
+
+    const { error: saveError } = await supabase
+      .from("room_categories")
+      .upsert(roomCategoryPayload, { onConflict: "slug" });
 
     if (saveError) {
       await supabase.storage.from(ROOM_IMAGE_BUCKET).remove([filePath]);
@@ -440,7 +513,13 @@ function AdminDashboard() {
       await supabase.storage.from(ROOM_IMAGE_BUCKET).remove([replacedImagePath]);
     }
 
-    updateRoomCardImagePaths(room.slug, imagePathsForSave);
+    const savedImagePaths = supportsImagePathsColumn
+      ? imagePathsForSave
+      : imagePathsForSave[0]
+        ? [imagePathsForSave[0]]
+        : [];
+
+    updateRoomCardImagePaths(room.slug, savedImagePaths);
     setUploadingRoomSlotKey(null);
     setRoomBanner({
       tone: "success",
@@ -450,6 +529,15 @@ function AdminDashboard() {
 
   const deleteRoomImage = async (room: RoomCard, slotIndex: number) => {
     if (slotIndex < 0 || slotIndex >= MAX_ROOM_IMAGES) {
+      return;
+    }
+
+    if (!supportsImagePathsColumn && slotIndex > 0) {
+      setRoomBanner({
+        tone: "error",
+        message:
+          "Slots 2-4 need the latest Supabase migration. Right now this project can clear only slot 1.",
+      });
       return;
     }
 
@@ -469,9 +557,13 @@ function AdminDashboard() {
 
     const nextImagePaths = room.imagePaths.filter((_, index) => index !== slotIndex);
 
+    const roomCategoryUpdate = supportsImagePathsColumn
+      ? { image_path: nextImagePaths[0] ?? null, image_paths: nextImagePaths }
+      : { image_path: nextImagePaths[0] ?? null };
+
     const { error: saveError } = await supabase
       .from("room_categories")
-      .update({ image_path: nextImagePaths[0] ?? null, image_paths: nextImagePaths })
+      .update(roomCategoryUpdate)
       .eq("slug", room.slug);
 
     if (saveError) {
@@ -484,7 +576,13 @@ function AdminDashboard() {
       .from(ROOM_IMAGE_BUCKET)
       .remove([imagePathToRemove]);
 
-    updateRoomCardImagePaths(room.slug, nextImagePaths);
+    const savedImagePaths = supportsImagePathsColumn
+      ? nextImagePaths
+      : nextImagePaths[0]
+        ? [nextImagePaths[0]]
+        : [];
+
+    updateRoomCardImagePaths(room.slug, savedImagePaths);
     setDeletingRoomSlotKey(null);
 
     if (removeStorageError) {
@@ -887,9 +985,9 @@ function AdminDashboard() {
                </div>
                <h2 className="mt-3 font-display text-2xl font-bold">Room image manager</h2>
                <p className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">
-                Add, replace, or delete up to {MAX_ROOM_IMAGES} custom images for each room
-                category below. The public room cards on the homepage will use these images
-                automatically.
+                {supportsImagePathsColumn
+                  ? `Add, replace, or delete up to ${MAX_ROOM_IMAGES} custom images for each room category below. The public room cards on the homepage will use these images automatically.`
+                  : "This project is on the legacy room image schema, so only slot 1 is writable right now. Run the latest Supabase migration to unlock slots 2-4."}
                </p>
              </div>
             <div className="rounded-full bg-muted px-3 py-2 text-xs text-muted-foreground">
@@ -933,7 +1031,8 @@ function AdminDashboard() {
                         const slotImage = room.customImages[slotIndex] ?? null;
                         const isUploading = uploadingRoomSlotKey === slotKey;
                         const isDeleting = deletingRoomSlotKey === slotKey;
-                        const slotIsBusy = isUploading || isDeleting || !!roomIsBusy;
+                        const legacySchemaLock = !supportsImagePathsColumn && slotIndex > 0;
+                        const slotIsBusy = isUploading || isDeleting || !!roomIsBusy || legacySchemaLock;
 
                         return (
                           <div
@@ -959,7 +1058,11 @@ function AdminDashboard() {
                                   Image slot {slotIndex + 1}
                                 </div>
                                 <div className="text-sm">
-                                  {slotPath ? "Custom image live" : "No image in this slot"}
+                                  {legacySchemaLock
+                                    ? "Locked until image_paths migration"
+                                    : slotPath
+                                      ? "Custom image live"
+                                      : "No image in this slot"}
                                 </div>
                               </div>
                             </div>
@@ -976,7 +1079,7 @@ function AdminDashboard() {
                                 ) : (
                                   <ImagePlus className="h-3.5 w-3.5" />
                                 )}
-                                {isUploading ? "Saving..." : slotPath ? "Replace" : "Add"}
+                                {legacySchemaLock ? "Locked" : isUploading ? "Saving..." : slotPath ? "Replace" : "Add"}
                                 <input
                                   type="file"
                                   accept="image/*"
@@ -1010,7 +1113,9 @@ function AdminDashboard() {
                       })}
                     </div>
                     <span className="mt-4 block text-xs text-muted-foreground">
-                      Upload JPG, PNG, or WebP files. Maximum {MAX_ROOM_IMAGES} images per room.
+                      {supportsImagePathsColumn
+                        ? `Upload JPG, PNG, or WebP files. Maximum ${MAX_ROOM_IMAGES} images per room.`
+                        : "Upload JPG, PNG, or WebP files. In legacy mode, only slot 1 can be saved."}
                     </span>
                   </div>
                 </article>

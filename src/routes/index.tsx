@@ -415,6 +415,41 @@ const RULES = [
   },
 ];
 
+type RoomCategoryImageRow = {
+  slug: string;
+  image_path: string | null;
+  image_paths?: string[] | null;
+};
+
+function isMissingImagePathsColumnError(message: string) {
+  const normalized = message.toLowerCase();
+
+  return normalized.includes("image_paths") && (normalized.includes("schema cache") || normalized.includes("column"));
+}
+
+async function loadRoomCategoryRows() {
+  const roomResponse = await supabase.from("room_categories").select("slug, image_path, image_paths");
+
+  if (!roomResponse.error) {
+    return (roomResponse.data ?? []) as RoomCategoryImageRow[];
+  }
+
+  if (!isMissingImagePathsColumnError(roomResponse.error.message)) {
+    return null;
+  }
+
+  const legacyRoomResponse = await supabase.from("room_categories").select("slug, image_path");
+
+  if (legacyRoomResponse.error) {
+    return null;
+  }
+
+  return (legacyRoomResponse.data ?? []).map((row) => ({
+    ...row,
+    image_paths: row.image_path ? [row.image_path] : [],
+  }));
+}
+
 function Landing() {
   const [heroMedia, setHeroMedia] = useState<SiteMediaAsset>(() => getDefaultHeroMedia());
   const [rooms, setRooms] = useState<RoomCard[]>(() => getDefaultRoomCards());
@@ -424,8 +459,8 @@ function Landing() {
     let active = true;
 
     const loadHomepageContent = async () => {
-      const [roomResponse, galleryResponse] = await Promise.all([
-        supabase.from("room_categories").select("slug, image_path, image_paths"),
+      const [roomRows, galleryResponse] = await Promise.all([
+        loadRoomCategoryRows(),
         supabase
           .from("gallery_images")
           .select("id, image_path, alt_text, created_at")
@@ -436,9 +471,9 @@ function Landing() {
         return;
       }
 
-      if (!roomResponse.error) {
+      if (roomRows) {
         setRooms(
-          buildRoomCards(roomResponse.data, (imagePath) =>
+          buildRoomCards(roomRows, (imagePath) =>
             supabase.storage.from(ROOM_IMAGE_BUCKET).getPublicUrl(imagePath).data.publicUrl,
           ),
         );
