@@ -14,6 +14,7 @@ import {
   Mail,
   Menu,
   MapPin,
+  AlertTriangle,
   Phone,
   Quote,
   ShieldCheck,
@@ -81,6 +82,9 @@ const CONTACT_ADDRESS = "Chintamani Park, Vishay Company Road, Kadamwak Wasti, M
 const CONTACT_EMAIL = "elitestay.loni@gmail.com";
 const CONTACT_PHONE_DISPLAY = "09553961076";
 const CONTACT_PHONE_RAW = "919553961076";
+const MAINTENANCE_BANNER_HEIGHT = 48;
+const NAV_HEIGHT = 80;
+const SITE_HEADER_HEIGHT = MAINTENANCE_BANNER_HEIGHT + NAV_HEIGHT;
 const MAP_LAT = "18.4920676";
 const MAP_LNG = "74.0211766";
 const GOOGLE_REVIEWS_URL =
@@ -524,6 +528,7 @@ function Landing() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
+      <MaintenanceBanner />
       <Nav />
       <Hero heroImage={heroMedia} />
       <Stats />
@@ -579,6 +584,35 @@ function WhatsAppIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+function MaintenanceBanner() {
+  return (
+    <div className="fixed inset-x-0 top-0 z-[60] border-b border-[#c9d8e5] bg-[linear-gradient(90deg,#f5f8fc_0%,#eef5fb_100%)] text-[#16304f] shadow-[0_12px_32px_-24px_rgba(16,32,51,0.35)]">
+      <div className="mx-auto flex h-12 max-w-7xl items-center justify-between gap-3 px-4 sm:px-5">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#1E3A5F]/10 text-[#1E3A5F]">
+            <AlertTriangle className="h-4 w-4" />
+          </span>
+          <p className="text-[11px] font-medium leading-tight text-[#16304f] sm:text-sm">
+            <span className="hidden sm:inline">
+              Site is under maintenance, still you can reach through WhatsApp
+            </span>
+            <span className="sm:hidden">Maintenance mode. WhatsApp open.</span>
+          </p>
+        </div>
+        <a
+          href={WHATSAPP}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#25D366] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:scale-[1.02] hover:bg-[#1fb85a]"
+        >
+          <WhatsAppIcon className="h-3.5 w-3.5" />
+          WhatsApp
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function Nav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -612,7 +646,10 @@ function Nav() {
   }, [mobileMenuOpen]);
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-[#1E3A5F]/96 shadow-sm backdrop-blur">
+    <header
+      className="fixed left-0 right-0 z-50 border-b border-white/10 bg-[#1E3A5F]/96 shadow-sm backdrop-blur"
+      style={{ top: MAINTENANCE_BANNER_HEIGHT }}
+    >
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-3 px-5">
         <a
           href="#home"
@@ -686,7 +723,8 @@ function Nav() {
             type="button"
             aria-label="Close navigation menu"
             onClick={() => setMobileMenuOpen(false)}
-            className="fixed inset-0 top-20 bg-[#0f2238]/52 backdrop-blur-[2px] md:hidden"
+            className="fixed inset-x-0 bottom-0 bg-[#0f2238]/52 backdrop-blur-[2px] md:hidden"
+            style={{ top: SITE_HEADER_HEIGHT }}
           />
           <motion.div
             id="mobile-nav-menu"
@@ -742,7 +780,7 @@ function Hero({ heroImage }: { heroImage: SiteMediaAsset }) {
   const y = useTransform(scrollY, [0, 600], [0, 120]);
 
   return (
-    <section id="home" className="relative min-h-[100svh] w-full scroll-mt-24 overflow-hidden">
+    <section id="home" className="relative min-h-[100svh] w-full scroll-mt-32 overflow-hidden">
       <motion.div style={{ y }} className="absolute inset-0">
         <img
           src={heroImage.src}
@@ -894,7 +932,7 @@ function About({ images }: { images: GalleryAsset[] }) {
   const marqueeImages = [...images, ...images];
 
   return (
-    <section id="about" className="section-bg-dot-light relative scroll-mt-28 pb-8 pt-18 sm:pb-10 sm:pt-20">
+    <section id="about" className="section-bg-dot-light relative scroll-mt-32 pb-8 pt-18 sm:pb-10 sm:pt-20">
       <div className="mx-auto grid max-w-7xl gap-10 px-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-stretch lg:gap-14">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1066,7 +1104,7 @@ function Rooms({ rooms }: { rooms: RoomCard[] }) {
   return (
     <section
       id="rooms"
-      className="section-bg-soft-blue relative scroll-mt-28 pb-14 pt-10 sm:pb-16 sm:pt-12"
+      className="section-bg-soft-blue relative scroll-mt-32 pb-14 pt-10 sm:pb-16 sm:pt-12"
     >
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-2xl text-center">
@@ -1137,7 +1175,7 @@ function Facilities() {
   return (
     <section
       id="facilities"
-      className="section-bg-light-wave relative scroll-mt-28 overflow-hidden pb-10 pt-12 sm:pb-12 sm:pt-14"
+      className="section-bg-light-wave relative scroll-mt-32 overflow-hidden pb-10 pt-12 sm:pb-12 sm:pt-14"
     >
       <div className="absolute inset-x-0 top-12 -z-10 mx-auto h-72 max-w-5xl rounded-full bg-[radial-gradient(circle,_rgba(30,58,95,0.12),_transparent_68%)] blur-3xl" />
       <div className="absolute left-0 top-1/3 -z-10 h-56 w-56 rounded-full bg-[radial-gradient(circle,_rgba(30,58,95,0.08),_transparent_70%)] blur-3xl" />
@@ -1206,7 +1244,7 @@ function Facilities() {
 
 function Food() {
   return (
-    <section id="food" className="section-bg-light-gray relative scroll-mt-28 py-18 sm:py-20">
+    <section id="food" className="section-bg-light-gray relative scroll-mt-32 py-18 sm:py-20">
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-3xl text-center">
           <SectionLabel>FOOD</SectionLabel>
@@ -1243,7 +1281,7 @@ function Food() {
 
 function WhyChooseUs() {
   return (
-    <section id="why-choose-us" className="section-bg-soft-blue relative scroll-mt-28 py-18 sm:py-20">
+    <section id="why-choose-us" className="section-bg-soft-blue relative scroll-mt-32 py-18 sm:py-20">
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-2xl text-center">
           <SectionLabel>WHY ELITE STAY PG</SectionLabel>
@@ -1275,7 +1313,7 @@ function WhyChooseUs() {
 
 function ParentTrust() {
   return (
-    <section id="parent-trust" className="section-bg-light-wave relative scroll-mt-28 py-18 sm:py-20">
+    <section id="parent-trust" className="section-bg-light-wave relative scroll-mt-32 py-18 sm:py-20">
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-3xl text-center">
           <SectionLabel>PARENT TRUST</SectionLabel>
@@ -1312,7 +1350,7 @@ function ParentTrust() {
 
 function Location() {
   return (
-    <section id="location" className="section-bg-mint relative scroll-mt-28 py-18 sm:py-20">
+    <section id="location" className="section-bg-mint relative scroll-mt-32 py-18 sm:py-20">
       <div className="mx-auto grid max-w-7xl gap-10 px-5 lg:grid-cols-2">
         <div>
           <SectionLabel>LOCATION</SectionLabel>
@@ -1351,7 +1389,7 @@ function Location() {
           </div>
         </div>
 
-        <div id="visit-map" className="scroll-mt-28 overflow-hidden rounded-3xl surface-card">
+        <div id="visit-map" className="scroll-mt-32 overflow-hidden rounded-3xl surface-card">
           <iframe
             title="Elite Stay location map"
             src={MAP_EMBED}
@@ -1370,7 +1408,7 @@ function Gallery({ images }: { images: GalleryAsset[] }) {
   const [open, setOpen] = useState<{ src: string; alt: string } | null>(null);
 
   return (
-    <section id="gallery" className="section-bg-navy relative scroll-mt-28 pb-18 pt-10 sm:pb-20 sm:pt-12">
+    <section id="gallery" className="section-bg-navy relative scroll-mt-32 pb-18 pt-10 sm:pb-20 sm:pt-12">
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-2xl text-center">
           <SectionLabel tone="light">OUR GALLERY</SectionLabel>
@@ -1676,7 +1714,7 @@ function Contact({ roomOptions }: { roomOptions: string[] }) {
   };
 
   return (
-    <section id="contact" className="section-bg-mint relative scroll-mt-28 pb-20 pt-18 sm:pb-22 sm:pt-20">
+    <section id="contact" className="section-bg-mint relative scroll-mt-32 pb-20 pt-18 sm:pb-22 sm:pt-20">
       <div className="mx-auto grid max-w-7xl gap-10 px-5 lg:grid-cols-2">
         <div>
           <SectionLabel>CONTACT US</SectionLabel>
@@ -1720,7 +1758,7 @@ function Contact({ roomOptions }: { roomOptions: string[] }) {
         <form
           id="contact-form"
           onSubmit={onSubmit}
-          className="scroll-mt-28 space-y-4 self-start rounded-3xl surface-card p-7"
+          className="scroll-mt-32 space-y-4 self-start rounded-3xl surface-card p-7"
         >
           <Field
             label="Name"
