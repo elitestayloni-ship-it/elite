@@ -586,13 +586,13 @@ function WhatsAppIcon({ className = "h-4 w-4" }: { className?: string }) {
 
 function MaintenanceBanner() {
   return (
-    <div className="fixed inset-x-0 top-0 z-[60] border-b border-[#c9d8e5] bg-[linear-gradient(90deg,#f5f8fc_0%,#eef5fb_100%)] text-[#16304f] shadow-[0_12px_32px_-24px_rgba(16,32,51,0.35)]">
+    <div className="fixed inset-x-0 top-0 z-[60] border-b border-[#d6b300] bg-[#FACC15] text-black shadow-[0_12px_32px_-24px_rgba(0,0,0,0.35)]">
       <div className="mx-auto flex h-12 max-w-7xl items-center justify-between gap-3 px-4 sm:px-5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#1E3A5F]/10 text-[#1E3A5F]">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-black/10 text-black">
             <AlertTriangle className="h-4 w-4" />
           </span>
-          <p className="text-[11px] font-medium leading-tight text-[#16304f] sm:text-sm">
+          <p className="text-[11px] font-medium leading-tight text-black sm:text-sm">
             <span className="hidden sm:inline">
               Site is under maintenance, still you can reach through WhatsApp
             </span>
